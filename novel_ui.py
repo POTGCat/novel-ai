@@ -5,6 +5,14 @@ import os
 import google.generativeai as genai
 import re
 
+st.set_page_config(
+    page_title="AI 소설 집필실",
+    page_icon="🖋️",
+    layout="wide" # 👈 핵심: 화면을 좌우로 꽉 채웁니다.
+    #,initial_sidebar_state="collapsed" # 👈 모바일 접속 시 사이드바를 미리 접어둡니다.
+)
+
+
 # --- [1. 파일 경로 설정] ---
 CONFIG_FILE = "config.json"
 SETTINGS_FILE = "settings.json"
@@ -138,23 +146,23 @@ default_settings = {
 # Streamlit 페이지 설정
 st.set_page_config(page_title="AI 소설 엔진 v0.1", page_icon="📖", layout="wide")
 
-st.markdown(
-    """
-    <style>
-    /* 사이드바 너비를 400px로 고정 (기본값은 약 250~300px) */
-    [data-testid="stSidebar"] {
-        min-width: 450px;
-        max-width: 450px;
-    }
-    /* 탭 간의 간격이나 폰트 크기를 살짝 조정하여 가독성 높임 */
-    button[data-baseweb="tab"] {
-        font-size: 14px;
-        margin-right: 0px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+#st.markdown(
+#    """
+#    <style>
+#    /* 사이드바 너비를 400px로 고정 (기본값은 약 250~300px) */
+#    [data-testid="stSidebar"] {
+#        min-width: 20px;
+#        max-width: 450px;
+#    }
+#    /* 탭 간의 간격이나 폰트 크기를 살짝 조정하여 가독성 높임 */
+#    button[data-baseweb="tab"] {
+#        font-size: 14px;
+#        margin-right: 0px;
+#    }
+#    </style>
+#    """,
+#    unsafe_allow_html=True
+#)
 
 if "settings" not in st.session_state:
     if IS_CLOUD:
