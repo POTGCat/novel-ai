@@ -301,9 +301,14 @@ with st.sidebar:
             disabled=not has_messages  # 🔥 메시지가 없으면 버튼이 클릭되지 않음
         )
 
-# 사용자 가이드 추가 (선택 사항)
-if not has_messages:
-    st.caption("※ 소설 내용이 있어야 저장 버튼이 활성화됩니다.")
+        # 사용자 가이드 추가 (선택 사항)
+        if not has_messages:
+            st.caption("※ 소설 내용이 있어야 저장 버튼이 활성화됩니다.")
+
+                
+        st.divider()
+        st.markdown("""<div style="text-align: center; padding: 10px; background-color: rgba(100, 100, 100, 0.1); border-radius: 10px;">
+            <span style="font-size: 2em;">🐱</span><br><b style="color: #FFD700;">제작자: POTG</b></div>""", unsafe_allow_html=True)
 
     # NPC 관리 탭
     with tab_npc:
@@ -496,6 +501,7 @@ if not has_messages:
         # NPC 수동 관리
         st.divider()
         st.subheader("👥 NPC 관리")
+
         with st.expander("➕ 새 NPC 수동 추가"):
             with st.form("manual_npc_add", clear_on_submit=True):
                 m_name = st.text_input("이름")
@@ -522,9 +528,6 @@ if not has_messages:
                     save_json(SETTINGS_FILE, st.session_state.settings)
                     st.rerun()
 
-    st.divider()
-    st.markdown("""<div style="text-align: center; padding: 10px; background-color: rgba(100, 100, 100, 0.1); border-radius: 10px;">
-        <span style="font-size: 2em;">🐱</span><br><b style="color: #FFD700;">제작자: POTG</b></div>""", unsafe_allow_html=True)
 
 # --- [6. 메인 화면 출력] ---
 st.title("✨ AI 소설")
