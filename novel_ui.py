@@ -49,32 +49,39 @@ def save_json(file_path, data):
 # --- [세션 초기화 및 API 로드] ---
 
 # 1. API 키 결정 로직
-active_api_key = None
-key_source = None  # 추가: 키의 출처를 기록
+# --- [API 및 모델 설정 로직: 로컬 & 클라우드 공용] ---
+def get_model_info():
+    """실시간으로 키를 찾고 모델과 '출처'를 함께 반환합니다."""
+    active_key = None
+    source = None
 
-if "user_api_key" in st.session_state and st.session_state.user_api_key:
-    active_api_key = st.session_state.user_api_key
-    key_source = "user"
-else:
-    try:
-        active_api_key = st.secrets.get("GEMINI_API_KEY")
-        if active_api_key:
-            key_source = "cloud"
-    except:
-        active_api_key = None
+    # 1. 세션 키
+    if st.session_state.get("user_api_key"):
+        active_key = st.session_state.user_api_key
+        source = "user"
+    # 2. 클라우드 시크릿
+    elif IS_CLOUD:
+        active_key = st.secrets.get("GEMINI_API_KEY")
+        if active_key: source = "cloud"
+    
+    # 3. 로컬 파일
+    if not active_key and not IS_CLOUD:
+        config_data = load_json(CONFIG_FILE, {"api_key": ""})
+        active_key = config_data.get('api_key', '')
+        if active_key: source = "local"
 
-    if not active_api_key:
-        config_data = load_json("config.json", {"api_key": ""})
-        active_api_key = config_data.get('api_key', '')
-        if active_api_key:
-            key_source = "local"
+    if active_key:
+        try:
+            genai.configure(api_key=active_key)
+            return genai.GenerativeModel('gemini-1.5-flash'), source, active_key
+        except:
+            return None, None, None
+    return None, None, None
 
-# 2. 모델 설정
-if active_api_key:
-    genai.configure(api_key=active_api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
-else:
-    model = None
+# 🔥 중요: 앱 시작 시 전역 변수들에 값을 할당해줍니다.
+model, key_source, active_api_key = get_model_info()
+
+
 
 # 3. 메시지 이력 로드 (로컬은 파일에서, 클라우드는 세션에서)
 if "messages" not in st.session_state:
@@ -331,28 +338,55 @@ with st.sidebar:
         
         if IS_CLOUD:
             st.warning("클라우드 모드입니다. 브라우저를 닫으면 내용이 사라지니 하단에서 파일을 꼭 백업하세요!")
+
+        # 1. 표시할 키 결정 로직
+        # 우선 세션에 있는지 확인
+        display_key = st.session_state.get("user_api_key", "")
     
-        # 개인 API 키 입력 섹션
+        # 세션에 없고, 로컬 환경이라면 config.json에서 읽어오기
+        if not display_key and not IS_CLOUD:
+            config_data = load_json(CONFIG_FILE, {"api_key": ""})
+            display_key = config_data.get('api_key', '')
+            # 읽어온 키를 세션에도 미리 넣어두면 get_model_info가 바로 인식합니다.
+            if display_key:
+                st.session_state.user_api_key = display_key
+
+        # 2. 입력 박스 (이제 로컬 키가 있다면 자동으로 채워집니다)
         user_key_input = st.text_input(
-            "개인 Gemini API Key 사용", 
-            value=st.session_state.get("user_api_key", ""), 
+            "Gemini API Key", 
+            value=display_key, # 여기서 결정된 키를 보여줍니다.
             type="password",
-            help="Google AI Studio에서 발급받은 본인의 키를 입력하세요. 입력 시 작가님의 쿼터가 우선 사용됩니다."
+            help="Google AI Studio에서 발급받은 키를 입력하세요."
         )
+    
 
         # 버튼들을 가로로 배치하기 위해 컬럼 생성
         col_key1, col_key2 = st.columns([1, 2])
 
-    
         with col_key1:
-            # 키 적용 버튼
-            if st.button("✅ 개인 키 적용/갱신", use_container_width=True):
-                st.session_state.user_api_key = user_key_input
-                st.success("API 키가 설정되었습니다!")
-                st.rerun()
+            # 키 적용 및 저장 버튼
+            if st.button("✅ 개인 키 적용/저장", use_container_width=True):
+                if user_key_input:
+                    # 1. 공통: 현재 세션에 즉시 반영
+                    st.session_state.user_api_key = user_key_input
+                    
+                    # 2. 로컬 환경일 때만: config.json 파일에 영구 저장
+                    if not IS_CLOUD:
+                        try:
+                            save_json(CONFIG_FILE, {"api_key": user_key_input})
+                            st.success("🏠 로컬 설정 파일에 키가 저장되었습니다!")
+                        except:
+                            st.error("파일 저장 중 오류가 발생했습니다.")
+                    else:
+                        st.success("☁️ 클라우드 세션에 키가 적용되었습니다!")
+                    
+                    # 3. 즉시 반영을 위해 리런 (상단의 get_model 함수가 새 키를 인식함)
+                    st.rerun()
+                else:
+                    st.warning("키를 입력해주세요.")
 
         with col_key2:
-            # Google AI Studio 링크 버튼 추가
+            # Google AI Studio 링크 버튼 유지
             st.link_button("🔑 API keys | Google AI Studio", 
                            "https://aistudio.google.com/app/apikey", 
                            use_container_width=True)
