@@ -267,10 +267,23 @@ with st.sidebar:
             type="password",
             help="Google AI Studio에서 발급받은 본인의 키를 입력하세요. 입력 시 작가님의 쿼터가 우선 사용됩니다."
         )
+
+        # 버튼들을 가로로 배치하기 위해 컬럼 생성
+        col_key1, col_key2 = st.columns([1, 2])
+
     
-        if st.button("개인 키 적용/갱신"):
-            st.session_state.user_api_key = user_key_input
-            st.success("API 키 설정이 변경되었습니다! (새로고침 시 적용)")
+        with col_key1:
+            # 키 적용 버튼
+            if st.button("✅ 개인 키 적용/갱신", use_container_width=True):
+                st.session_state.user_api_key = user_key_input
+                st.success("API 키가 설정되었습니다!")
+                st.rerun()
+
+        with col_key2:
+            # Google AI Studio 링크 버튼 추가
+            st.link_button("🔑 API keys | Google AI Studio", 
+                           "https://aistudio.google.com/app/apikey", 
+                           use_container_width=True)
 
         st.divider()
 
