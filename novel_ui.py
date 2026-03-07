@@ -17,7 +17,8 @@ HISTORY_FILE = "story_log.json"
 IS_CLOUD = os.path.exists("/app") or "STREAMLIT_RUNTIME_ENV" in os.environ
 
 if st.session_state.get("show_load_success"):
-    st.success("✅ 소설과 설정값을 모두 불러왔습니다!")
+    #st.success("✅ 소설과 설정값을 모두 불러왔습니다!")
+    st.toast("✅ 불러오기 완료!")
     del st.session_state["show_load_success"] # 한 번 띄웠으면 삭제
 
 def load_json(file_path, default_data):
