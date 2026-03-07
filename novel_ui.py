@@ -232,20 +232,30 @@ with st.sidebar:
         # 1. 불러오기 (Upload) - 설정값까지 복구
         uploaded_file = st.file_uploader("소설 파일(.json) 불러오기", type="json")
         if uploaded_file is not None:
-            try:
-                uploaded_data = json.load(uploaded_file)
-                
-                # 소설 내용 복구
-                st.session_state.messages = uploaded_data.get("chat_history", [])
-        
-                # [추가] 설정값 복구 (파일에 설정 데이터가 있을 경우에만)
-                if "settings" in uploaded_data:
-                    st.session_state.settings.update(uploaded_data["settings"])
+            # 1. 이미 처리된 파일인지 확인 (중복 실행 방지)
+            if "last_uploaded_file" not in st.session_state or st.session_state.last_uploaded_file != uploaded_file.name:
+                try:
+                    # 파일 읽기
+                    uploaded_data = json.load(uploaded_file)
             
-                st.success("소설과 설정값을 모두 불러왔습니다!")
-                st.rerun()
-            except:
-                st.error("파일 형식이 올바르지 않거나 데이터가 손상되었습니다.")
+                    # 데이터 복구
+                    if "chat_history" in uploaded_data:
+                        st.session_state.messages = uploaded_data["chat_history"]
+            
+                    if "settings" in uploaded_data:
+                        # 기존 설정에 덮어쓰기
+                        st.session_state.settings.update(uploaded_data["settings"])
+            
+                    # 처리 완료 기록
+                    st.session_state.last_uploaded_file = uploaded_file.name
+                    st.success("✅ 소설과 설정값을 모두 불러왔습니다!")
+            
+                    # 즉시 반영을 위해 리런
+                    st.rerun()
+            
+                except Exception as e:
+                    # 진짜 에러일 때만 표시
+                    st.error(f"파일 형식이 올바르지 않습니다. (오류: {e})")
 
         # 2. 내보내기 (Download) - 설정값 포함하여 패킹
         if st.session_state.messages:
