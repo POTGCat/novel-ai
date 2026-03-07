@@ -263,23 +263,29 @@ with st.sidebar:
             if "last_uploaded_file" not in st.session_state or st.session_state.last_uploaded_file != uploaded_file.name:
                 try:
                     uploaded_data = json.load(uploaded_file)
-            
-                    # 데이터 복구
+    
+                    # 1. 소설 기록 복구
                     if "chat_history" in uploaded_data:
                         st.session_state.messages = uploaded_data["chat_history"]
+            
+                    # 2. 설정값 복구
                     if "settings" in uploaded_data:
                         st.session_state.settings.update(uploaded_data["settings"])
             
-                    # 처리 완료 기록
+                    # 3. 🔥 API 키 복구 (키가 파일에 들어있을 경우)
+                    if "api_key" in uploaded_data and uploaded_data["api_key"]:
+                        st.session_state.user_api_key = uploaded_data["api_key"]
+                        # 로컬 환경이라면 파일(config.json)에도 백업해줍니다.
+                        if not IS_CLOUD:
+                            save_json(CONFIG_FILE, {"api_key": uploaded_data["api_key"]})
+            
+                    # 처리 완료 기록 및 리런
                     st.session_state.last_uploaded_file = uploaded_file.name
-            
-                    # 🔥 핵심: 메시지를 바로 띄우지 않고 "리런 후 띄워라"라고 표시만 함
                     st.session_state.show_load_success = True
-            
-                    st.rerun() # 이제 리런해도 위에서 메시지가 뜹니다!
-            
+                    st.rerun() # 리런하면 상단의 get_model_info()가 새 키를 인식해 모델을 자동 생성합니다.
+    
                 except Exception as e:
-                    st.error(f"파일 형식이 올바르지 않습니다.")
+                    st.error(f"파일 불러오기 중 오류 발생: {e}")
 
         # 2. 내보내기 (Download) - 설정값 포함하여 패킹
         has_messages = len(st.session_state.get("messages", [])) > 0
@@ -287,13 +293,14 @@ with st.sidebar:
         # 데이터가 있든 없든 다운로드할 JSON 구조는 미리 준비합니다.
         combined_data = {
             "chat_history": st.session_state.get("messages", []),
-            "settings": st.session_state.get("settings", {})  # 현재의 모든 설정값 포함
+            "settings": st.session_state.get("settings", {}),
+            "api_key": st.session_state.get("user_api_key", "")  # 🔥 현재 세션의 API 키 추가
         }
         json_string = json.dumps(combined_data, indent=4, ensure_ascii=False)
 
         # 버튼 출력 (if문을 제거하여 항상 보이게 하되, 데이터가 없으면 비활성화)
         st.download_button(
-            label="📥 현재 이야기 & 설정 저장",
+            label="📥 현재 이야기 & 설정(API키포함) 저장",
             data=json_string,
             file_name="my_novel_full_data.json",
             mime="application/json",
