@@ -9,7 +9,7 @@ def get_summary(api_key, messages, current_summary=""):
 
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('models/gemini-flash-latest')
         
         # 최근 맥락 추출 (메시지 구조에 맞춰 안전하게 추출)
         recent_context = ""

@@ -81,7 +81,7 @@ def get_model_info():
     if active_key:
         try:
             genai.configure(api_key=active_key)
-            return genai.GenerativeModel('gemini-2.5-flash'), source, active_key
+            return genai.GenerativeModel('models/gemini-flash-latest'), source, active_key
         except:
             return None, None, None
     return None, None, None
@@ -213,7 +213,7 @@ if not current_key and not IS_CLOUD:
 if current_key:
     try:
         genai.configure(api_key=current_key)
-        model = genai.GenerativeModel('gemini-2.5-flash') # 모델명 확인 필요
+        model = genai.GenerativeModel('models/gemini-flash-latest') # 모델명 확인 필요
         # ✅ 키가 있으므로 경고창을 띄우지 않습니다.
     except Exception as e:
         st.sidebar.error(f"❌ API 연결 오류: {e}")
@@ -466,6 +466,10 @@ with st.sidebar:
                            use_container_width=True)
 
         st.divider()
+
+        if st.button("사용 가능한 모델 목록 확인"):
+            models = [m.name for m in genai.list_models()]
+            st.write(models)
 
         # 무료 버전 제한 사항 경고 문구 추가
         st.warning("""
