@@ -125,7 +125,25 @@ story_settings = load_json(SETTINGS_FILE, default_settings)
 chat_history = load_json(HISTORY_FILE, {"chat_history": []}).get("chat_history", [])
 
 # Streamlit 페이지 설정
-st.set_page_config(page_title="AI 소설 엔진 v2.5", page_icon="📖", layout="wide")
+st.set_page_config(page_title="AI 소설 엔진 v0.1", page_icon="📖", layout="wide")
+
+st.markdown(
+    """
+    <style>
+    /* 사이드바 너비를 400px로 고정 (기본값은 약 250~300px) */
+    [data-testid="stSidebar"] {
+        min-width: 400px;
+        max-width: 400px;
+    }
+    /* 탭 간의 간격이나 폰트 크기를 살짝 조정하여 가독성 높임 */
+    button[data-baseweb="tab"] {
+        font-size: 14px;
+        margin-right: 0px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 if "settings" not in st.session_state:
     st.session_state.settings = story_settings
