@@ -121,8 +121,6 @@ default_settings = {
     "custom_sys_inst": "당신은 소설 작가입니다. 아래의 [현재 줄거리]를 인지하고 다음 이야기를 전개하세요. 아래 지침에 따라 **최소 3~5문단 이상의 풍부한 분량**으로 서술하세요.\n"
 }
 
-story_settings = load_json(SETTINGS_FILE, default_settings)
-chat_history = load_json(HISTORY_FILE, {"chat_history": []}).get("chat_history", [])
 
 # Streamlit 페이지 설정
 st.set_page_config(page_title="AI 소설 엔진 v0.1", page_icon="📖", layout="wide")
@@ -146,9 +144,21 @@ st.markdown(
 )
 
 if "settings" not in st.session_state:
-    st.session_state.settings = story_settings
+    if IS_CLOUD:
+        # 클라우드에서는 서버 파일을 무시하고 '정의된 기본값'을 직접 복사해서 사용
+        # dict.copy()를 써서 원본 데이터가 오염되지 않게 합니다.
+        st.session_state.settings = default_settings.copy()
+    else:
+        # 로컬일 때만 파일(settings.json)에서 읽어옵니다.
+        st.session_state.settings = load_json(SETTINGS_FILE, default_settings)
 if "messages" not in st.session_state:
-    st.session_state.messages = chat_history
+    if IS_CLOUD:
+        # 클라우드라면 서버 파일(story_log.json)을 무시하고 무조건 빈 리스트로 시작
+        st.session_state.messages = []
+    else:
+        # 로컬일 때만 파일을 읽어옴
+        history_data = load_json(HISTORY_FILE, {"chat_history": []})
+        st.session_state.messages = history_data.get("chat_history", [])
 
 #--------------------------------------------------------------------------------------------------
 # Gemini 모델 설정
