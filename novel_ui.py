@@ -11,12 +11,22 @@ SETTINGS_FILE = "settings.json"
 HISTORY_FILE = "story_log.json"
 
 # --- [2. 데이터 관리 함수] ---
+# [추가] 클라우드 여부 확인 (Streamlit Cloud는 보통 이 환경변수가 존재함)
+# [환경 체크] 클라우드 배포 상태인지 확인
+IS_CLOUD = "STREAMLIT_RUNTIME_ENV" in os.environ or "STREAMLIT_SERVER_PORT" in os.environ
+
 def load_json(file_path, default_data):
-    """JSON 파일을 로드하거나 실패 시 기본 데이터를 반환합니다."""
+    """작가님이 주신 로직을 살리되, 클라우드라면 빈 데이터를 반환하여 충돌을 방지합니다."""
+    if IS_CLOUD:
+        return default_data  # 클라우드에선 공용 서버 파일을 읽지 않음
+    
     if not os.path.exists(file_path):
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(default_data, f, indent=4, ensure_ascii=False)
-        return default_data
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(default_data, f, indent=4, ensure_ascii=False)
+            return default_data
+        except:
+            return default_data
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -24,9 +34,43 @@ def load_json(file_path, default_data):
         return default_data
 
 def save_json(file_path, data):
-    """데이터를 JSON 파일로 저장합니다."""
+    """로컬에서만 파일로 저장합니다."""
+    if IS_CLOUD:
+        return # 클라우드에선 서버 파일에 쓰지 않음
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
+
+# --- [세션 초기화 및 API 로드] ---
+
+# 1. API 키 결정 로직
+active_api_key = None
+
+# 우선순위 1: 사용자가 화면에서 직접 입력한 키 (개인별 세션)
+if "user_api_key" in st.session_state and st.session_state.user_api_key:
+    active_api_key = st.session_state.user_api_key
+else:
+    # 우선순위 2: 클라우드 시크릿 (작가님 제공 체험용)
+    try:
+        active_api_key = st.secrets.get("GEMINI_API_KEY")
+    except:
+        active_api_key = None
+
+    # 우선순위 3: 로컬 config.json (내 컴퓨터 실행용)
+    if not active_api_key:
+        config_data = load_json("config.json", {"api_key": ""})
+        active_api_key = config_data.get('api_key', '')
+
+# 2. 모델 설정
+if active_api_key:
+    genai.configure(api_key=active_api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    model = None
+
+# 3. 메시지 이력 로드 (로컬은 파일에서, 클라우드는 세션에서)
+if "messages" not in st.session_state:
+    history_data = load_json("story_log.json", {"chat_history": []})
+    st.session_state.messages = history_data.get("chat_history", [])
 
 # --- [3. 텍스트 스타일 처리 함수] ---
 def format_novel_text(text):
@@ -130,6 +174,35 @@ with st.sidebar:
         else:
             st.error("키 설정 필요")
 
+        st.divider()
+        st.subheader("💾 데이터 관리")
+    
+        if IS_CLOUD:
+            st.info("클라우드 모드: 브라우저 종료 시 내용이 사라지니 꼭 저장하세요!")
+    
+        # 1. 불러오기 (Upload)
+        uploaded_file = st.file_uploader("소설 파일(.json) 불러오기", type="json")
+        if uploaded_file is not None:
+            try:
+                uploaded_data = json.load(uploaded_file)
+                st.session_state.messages = uploaded_data.get("chat_history", [])
+                st.success("소설을 불러왔습니다!")
+                # 주의: 여기서 st.rerun()을 하면 업로더가 초기화될 수 있으니 상황에 따라 조절
+            except:
+                st.error("파일 형식이 올바르지 않습니다.")
+
+        # 2. 내보내기 (Download)
+        if st.session_state.messages:
+            output_data = {"chat_history": st.session_state.messages}
+            json_string = json.dumps(output_data, indent=4, ensure_ascii=False)
+            st.download_button(
+                label="📥 현재 이야기 다운로드",
+                data=json_string,
+                file_name="my_novel_history.json",
+                mime="application/json",
+                use_container_width=True
+            )
+
     # NPC 관리 탭
     with tab_npc:
         st.subheader("주변 인물 & 호감도")
@@ -181,24 +254,25 @@ with st.sidebar:
 
     # 설정 탭
     with tab_set:
-        # API 설정
-        input_key = st.text_input("Gemini API Key", value=config_data.get('api_key', ''), type="password")
+
+        st.subheader("🔑 API 보안/설정")
         
-        # 버튼들을 가로로 배치하기 위해 컬럼 생성
-        col_key1, col_key2 = st.columns([1, 2])
-        
-        with col_key1:
-            if st.button("키 저장", use_container_width=True):
-                config_data['api_key'] = input_key
-                save_json(CONFIG_FILE, config_data)
-                st.success("API 키 저장 완료!")
-                st.rerun()
-        
-        with col_key2:
-            # Google AI Studio 링크 버튼 추가
-            st.link_button("🔑 API keys | Google AI Studio", 
-                           "https://aistudio.google.com/app/apikey", 
-                           use_container_width=True)
+        if IS_CLOUD:
+            st.warning("클라우드 모드입니다. 브라우저를 닫으면 내용이 사라지니 하단에서 파일을 꼭 백업하세요!")
+    
+        # 개인 API 키 입력 섹션
+        user_key_input = st.text_input(
+            "개인 Gemini API Key 사용", 
+            value=st.session_state.get("user_api_key", ""), 
+            type="password",
+            help="Google AI Studio에서 발급받은 본인의 키를 입력하세요. 입력 시 작가님의 쿼터가 우선 사용됩니다."
+        )
+    
+        if st.button("개인 키 적용/갱신"):
+            st.session_state.user_api_key = user_key_input
+            st.success("API 키 설정이 변경되었습니다! (새로고침 시 적용)")
+
+        st.divider()
 
         # 무료 버전 제한 사항 경고 문구 추가
         st.warning("""
