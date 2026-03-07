@@ -507,61 +507,65 @@ for i, msg in enumerate(msgs_to_show):
 # --- [7. 채팅 입력 및 AI 응답 처리] ---
 if prompt := st.chat_input("행동이나 대사를 입력하세요..."):
     # 명령어 처리 (!추가)
-    if prompt.startswith("!추가 "):
-        try:
-            name_part = prompt.replace("!추가 ", "").strip()
-            chars = st.session_state.settings.get('characters', {})
-            new_id = f"npc_{int(re.sub(r'[^0-9]', '', max(chars.keys(), default='npc_0'))) + 1}"
-            st.session_state.settings['characters'][new_id] = {"name": name_part, "description": "새로 추가된 인물", "likability": 0, "is_visible": True}
-            save_json(SETTINGS_FILE, st.session_state.settings)
-            st.toast(f"✨ {name_part}가 추가되었습니다!"); st.rerun()
-        except: st.error("명령어 형식을 확인하세요.")
-    
-    # 일반 채팅 처리
+    if model is None:
+        st.error("⚠️ API 키가 설정되지 않았습니다! '⚙️ 설정 및 관리' 탭에서 Gemini API 키를 입력하거나 적용해 주세요.")
     else:
-        with st.chat_message("user"):
-            st.markdown(format_novel_text(prompt), unsafe_allow_html=True)
 
-        st.session_state.messages.append({"role": "user", "parts": [prompt]})
-        save_json(HISTORY_FILE, {"chat_history": st.session_state.messages})
-
-        # 일정 주기마다 요약 업데이트
-        if len(st.session_state.messages) % 10 == 0:
-            with st.spinner("중간 줄거리 정리 중..."):
-                old_summary = st.session_state.settings.get('story_summary', "")
-                new_summary = get_summary(config_data['api_key'], st.session_state.messages, old_summary)
-                st.session_state.settings['story_summary'] = new_summary
+        if prompt.startswith("!추가 "):
+            try:
+                name_part = prompt.replace("!추가 ", "").strip()
+                chars = st.session_state.settings.get('characters', {})
+                new_id = f"npc_{int(re.sub(r'[^0-9]', '', max(chars.keys(), default='npc_0'))) + 1}"
+                st.session_state.settings['characters'][new_id] = {"name": name_part, "description": "새로 추가된 인물", "likability": 0, "is_visible": True}
                 save_json(SETTINGS_FILE, st.session_state.settings)
+                st.toast(f"✨ {name_part}가 추가되었습니다!"); st.rerun()
+            except: st.error("명령어 형식을 확인하세요.")
         
-        # AI 작가 응답 생성
-        with st.chat_message("model"):
-            with st.spinner("작가가 집필 중..."):
-                ss = st.session_state.settings
-                p = ss['player_setting']
-                current_story = ss.get('story_summary', "이제 막 이야기가 시작되었습니다.")
-                char_info = "\n".join([f"- {v['name']}: {v['description']} (호감도: {v.get('likability', 0)})" for v in ss['characters'].values() if v.get('is_visible', True)])
+        # 일반 채팅 처리
+        else:
+            with st.chat_message("user"):
+                st.markdown(format_novel_text(prompt), unsafe_allow_html=True)
 
-                # 토큰 절약을 위해 전송 기록 최적화
-                history_to_send = st.session_state.messages[-6:]
+            st.session_state.messages.append({"role": "user", "parts": [prompt]})
+            save_json(HISTORY_FILE, {"chat_history": st.session_state.messages})
 
-                # 시스템 지침 조립
-                restriction_rule = f"1. [절대 금지]: 주인공({p['name']})의 직접적인 대사, 생각, 감정 묘사를 당신(AI)이 임의로 작성하지 마십시오." if ss.get('restrict_player_dialogue', True) else f"1. [허용]: 주인공({p['name']})의 대사를 상황에 맞게 작성하세요."
+            # 일정 주기마다 요약 업데이트
+            if len(st.session_state.messages) % 10 == 0:
+                with st.spinner("중간 줄거리 정리 중..."):
+                    old_summary = st.session_state.settings.get('story_summary', "")
+                    new_summary = get_summary(config_data['api_key'], st.session_state.messages, old_summary)
+                    st.session_state.settings['story_summary'] = new_summary
+                    save_json(SETTINGS_FILE, st.session_state.settings)
+            
+            # AI 작가 응답 생성
+            with st.chat_message("model"):
+                with st.spinner("작가가 집필 중..."):
+                    ss = st.session_state.settings
+                    p = ss['player_setting']
+                    current_story = ss.get('story_summary', "이제 막 이야기가 시작되었습니다.")
+                    char_info = "\n".join([f"- {v['name']}: {v['description']} (호감도: {v.get('likability', 0)})" for v in ss['characters'].values() if v.get('is_visible', True)])
 
-                sys_inst = (
-                    f"{ss.get('custom_sys_inst', '당신은 소설 작가입니다.')}\n\n"
-                    f"[현재 줄거리]: {current_story}\n\n"
-                    f"[인물 정보]:\n{char_info}\n\n"
-                    f"[제한 사항]:\n{restriction_rule}\n\n"
-                    f"[핵심 규칙]:\n{ss.get('custom_rules', '')}\n\n"
-                    f"문체: {ss.get('writing_style', '')}\n"
-                    f"세계관: {ss.get('world_setting', '').replace('{{user}}', p['name'])}\n"
-                )
-                
-                try:
-                    chat = model.start_chat(history=history_to_send[:-1])
-                    response = chat.send_message(f"{sys_inst}\n\n입력: {prompt}")
-                    st.session_state.messages.append({"role": "model", "parts": [response.text]})
-                    save_json(HISTORY_FILE, {"chat_history": st.session_state.messages})
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"오류: {e}")
+                    # 토큰 절약을 위해 전송 기록 최적화
+                    history_to_send = st.session_state.messages[-6:]
+
+                    # 시스템 지침 조립
+                    restriction_rule = f"1. [절대 금지]: 주인공({p['name']})의 직접적인 대사, 생각, 감정 묘사를 당신(AI)이 임의로 작성하지 마십시오." if ss.get('restrict_player_dialogue', True) else f"1. [허용]: 주인공({p['name']})의 대사를 상황에 맞게 작성하세요."
+
+                    sys_inst = (
+                        f"{ss.get('custom_sys_inst', '당신은 소설 작가입니다.')}\n\n"
+                        f"[현재 줄거리]: {current_story}\n\n"
+                        f"[인물 정보]:\n{char_info}\n\n"
+                        f"[제한 사항]:\n{restriction_rule}\n\n"
+                        f"[핵심 규칙]:\n{ss.get('custom_rules', '')}\n\n"
+                        f"문체: {ss.get('writing_style', '')}\n"
+                        f"세계관: {ss.get('world_setting', '').replace('{{user}}', p['name'])}\n"
+                    )
+                    
+                    try:
+                        chat = model.start_chat(history=history_to_send[:-1])
+                        response = chat.send_message(f"{sys_inst}\n\n입력: {prompt}")
+                        st.session_state.messages.append({"role": "model", "parts": [response.text]})
+                        save_json(HISTORY_FILE, {"chat_history": st.session_state.messages})
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"오류: {e}")
