@@ -191,12 +191,27 @@ if not api_key:
     api_key = config_data.get('api_key', '')
 
 # 최종적으로 결정된 api_key로 모델 설정
-if api_key:
-    genai.configure(api_key=api_key)
-    # 모델명 확인 (작가님이 쓰시는 버전 유지)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+# 1. 실시간으로 현재 사용할 수 있는 키를 결정합니다.
+current_key = st.session_state.get("user_api_key")
+
+# 2. 세션에 키가 없다면 로컬 파일(config.json)에서 읽어오기 (로컬 환경 배려)
+if not current_key and not IS_CLOUD:
+    config_data = load_json(CONFIG_FILE, {"api_key": ""})
+    current_key = config_data.get('api_key', '')
+    if current_key:
+        st.session_state.user_api_key = current_key # 세션에 동기화
+
+# 3. 키 존재 여부에 따른 모델 생성 및 경고 제어
+if current_key:
+    try:
+        genai.configure(api_key=current_key)
+        model = genai.GenerativeModel('gemini-2.5-flash') # 모델명 확인 필요
+        # ✅ 키가 있으므로 경고창을 띄우지 않습니다.
+    except Exception as e:
+        st.sidebar.error(f"❌ API 연결 오류: {e}")
+        model = None
 else:
-    # 키가 없을 때만 사이드바에 안내
+    # 🔴 키가 없을 때만 사이드바에 경고 노출
     st.sidebar.warning("🔑 API 키를 설정 탭에서 입력해주세요.")
     model = None
 #--------------------------------------------------------------------------------------------------
