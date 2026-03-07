@@ -63,7 +63,7 @@ else:
 # 2. 모델 설정
 if active_api_key:
     genai.configure(api_key=active_api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
 else:
     model = None
 
