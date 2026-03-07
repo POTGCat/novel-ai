@@ -672,11 +672,33 @@ if prompt := st.chat_input("행동이나 대사를 입력하세요..."):
                         f"세계관: {ss.get('world_setting', '').replace('{{user}}', p['name'])}\n"
                     )
                     
+                    
                     try:
+                        # 1. 채팅 세션 시작
                         chat = model.start_chat(history=history_to_send[:-1])
-                        response = chat.send_message(f"{sys_inst}\n\n입력: {prompt}")
-                        st.session_state.messages.append({"role": "model", "parts": [response.text]})
+                        
+                        # 2. 어시스턴트 메시지 칸 생성
+                        with st.chat_message("assistant"):
+                            # stream=True 옵션 사용
+                            response_stream = chat.send_message(f"{sys_inst}\n\n입력: {prompt}", stream=True)
+                            
+                            # 🔥 [수정 포인트]: 객체 전체가 아닌 'text'만 뽑아서 스트리밍합니다.
+                            full_response = st.write_stream(chunk.text for chunk in response_stream)
+                        
+                        # 3. 답변 저장
+                        st.session_state.messages.append({"role": "model", "parts": [full_response]})
+                        
+                        # 4. 파일 저장 및 요약 로직 (기존과 동일)
                         save_json(HISTORY_FILE, {"chat_history": st.session_state.messages})
+                        
+                        if len(st.session_state.messages) % 10 == 0:
+                            with st.spinner("중간 줄거리 정리 중..."):
+                                old_summary = ss.get('story_summary', "")
+                                new_summary = get_summary(active_api_key, st.session_state.messages, old_summary)
+                                ss['story_summary'] = new_summary
+                                save_json(SETTINGS_FILE, ss)
+                        
                         st.rerun()
+
                     except Exception as e:
                         st.error(f"오류: {e}")
