@@ -16,6 +16,10 @@ HISTORY_FILE = "story_log.json"
 #IS_CLOUD = "STREAMLIT_RUNTIME_ENV" in os.environ or "STREAMLIT_SERVER_PORT" in os.environ
 IS_CLOUD = os.path.exists("/app") or "STREAMLIT_RUNTIME_ENV" in os.environ
 
+if st.session_state.get("show_load_success"):
+    st.success("✅ 소설과 설정값을 모두 불러왔습니다!")
+    del st.session_state["show_load_success"] # 한 번 띄웠으면 삭제
+
 def load_json(file_path, default_data):
     """작가님이 주신 로직을 살리되, 클라우드라면 빈 데이터를 반환하여 충돌을 방지합니다."""
     if IS_CLOUD:
@@ -231,31 +235,28 @@ with st.sidebar:
     
         # 1. 불러오기 (Upload) - 설정값까지 복구
         uploaded_file = st.file_uploader("소설 파일(.json) 불러오기", type="json")
+        
         if uploaded_file is not None:
-            # 1. 이미 처리된 파일인지 확인 (중복 실행 방지)
             if "last_uploaded_file" not in st.session_state or st.session_state.last_uploaded_file != uploaded_file.name:
                 try:
-                    # 파일 읽기
                     uploaded_data = json.load(uploaded_file)
             
                     # 데이터 복구
                     if "chat_history" in uploaded_data:
                         st.session_state.messages = uploaded_data["chat_history"]
-            
                     if "settings" in uploaded_data:
-                        # 기존 설정에 덮어쓰기
                         st.session_state.settings.update(uploaded_data["settings"])
             
                     # 처리 완료 기록
                     st.session_state.last_uploaded_file = uploaded_file.name
-                    st.success("✅ 소설과 설정값을 모두 불러왔습니다!")
             
-                    # 즉시 반영을 위해 리런
-                    st.rerun()
+                    # 🔥 핵심: 메시지를 바로 띄우지 않고 "리런 후 띄워라"라고 표시만 함
+                    st.session_state.show_load_success = True
+            
+                    st.rerun() # 이제 리런해도 위에서 메시지가 뜹니다!
             
                 except Exception as e:
-                    # 진짜 에러일 때만 표시
-                    st.error(f"파일 형식이 올바르지 않습니다. (오류: {e})")
+                    st.error(f"파일 형식이 올바르지 않습니다.")
 
         # 2. 내보내기 (Download) - 설정값 포함하여 패킹
         if st.session_state.messages:
