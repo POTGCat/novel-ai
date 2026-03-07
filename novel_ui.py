@@ -282,20 +282,28 @@ with st.sidebar:
                     st.error(f"파일 형식이 올바르지 않습니다.")
 
         # 2. 내보내기 (Download) - 설정값 포함하여 패킹
-        if st.session_state.messages:
-            # 소설 내용과 현재 세션의 설정을 하나의 딕셔너리로 묶음
-            combined_data = {
-                "chat_history": st.session_state.messages,
-                "settings": st.session_state.settings  # 현재의 모든 설정값 포함
-            }
-            json_string = json.dumps(combined_data, indent=4, ensure_ascii=False)
-            st.download_button(
-                label="📥 현재 이야기 & 설정 저장",
-                data=json_string,
-                file_name="my_novel_full_data.json",
-                mime="application/json",
-                use_container_width=True
-            )
+        has_messages = len(st.session_state.get("messages", [])) > 0
+
+        # 데이터가 있든 없든 다운로드할 JSON 구조는 미리 준비합니다.
+        combined_data = {
+            "chat_history": st.session_state.get("messages", []),
+            "settings": st.session_state.get("settings", {})  # 현재의 모든 설정값 포함
+        }
+        json_string = json.dumps(combined_data, indent=4, ensure_ascii=False)
+
+        # 버튼 출력 (if문을 제거하여 항상 보이게 하되, 데이터가 없으면 비활성화)
+        st.download_button(
+            label="📥 현재 이야기 & 설정 저장",
+            data=json_string,
+            file_name="my_novel_full_data.json",
+            mime="application/json",
+            use_container_width=True,
+            disabled=not has_messages  # 🔥 메시지가 없으면 버튼이 클릭되지 않음
+        )
+
+# 사용자 가이드 추가 (선택 사항)
+if not has_messages:
+    st.caption("※ 소설 내용이 있어야 저장 버튼이 활성화됩니다.")
 
     # NPC 관리 탭
     with tab_npc:
