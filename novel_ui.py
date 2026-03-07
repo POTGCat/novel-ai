@@ -508,7 +508,7 @@ for i, msg in enumerate(msgs_to_show):
 if prompt := st.chat_input("행동이나 대사를 입력하세요..."):
     # 명령어 처리 (!추가)
     if model is None:
-        st.error("⚠️ API 키가 설정되지 않았습니다! '⚙️ 설정 및 관리' 탭에서 Gemini API 키를 입력하거나 적용해 주세요.")
+        st.error("⚠️ API 키가 설정되지 않았습니다! '⚙️ 설정' 탭에서 Gemini API 키를 입력하거나 적용해 주세요.")
     else:
 
         if prompt.startswith("!추가 "):
