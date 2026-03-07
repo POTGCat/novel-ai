@@ -166,13 +166,27 @@ with st.sidebar:
     with tab_info:
         s = st.session_state.settings
         st.info(f"**주인공:** {s['player_setting']['name']}\n\n**상태:** {s['player_setting']['current_status']}")
+
         st.divider()
+
         st.subheader("🛠️ API 상태")
-        if config_data.get('api_key'):
-            st.success("연결됨")
+        
+        # 현재 실제로 모델이 사용 중인 active_api_key를 기준으로 판단합니다.
+        if active_api_key:
+            # 사용자가 직접 입력한 키인지, 시스템(작가님) 키인지 구분
+            if st.session_state.get("user_api_key"):
+                st.success("✅ 개인 API 키 연결됨")
+                st.caption("현재 본인의 API 쿼터를 사용 중입니다.")
+            elif IS_CLOUD:
+                st.info("☁️ 공용 API 키 연결됨")
+                st.caption("작가님이 제공한 체험용 쿼터를 사용 중입니다.")
+            else:
+                st.success("🏠 로컬 API 키 연결됨")
+            
             st.markdown("[사용량 확인](https://aistudio.google.com/app/plan_free)")
         else:
-            st.error("키 설정 필요")
+            st.error("❌ API 키 설정 필요")
+            st.caption("설정 탭에서 API 키를 입력해야 소설 작성이 가능합니다.")
 
         st.divider()
         st.subheader("💾 데이터 관리")
