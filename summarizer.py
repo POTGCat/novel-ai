@@ -7,34 +7,35 @@ def get_summary(api_key, messages, current_summary=""):
     if not api_key:
         return current_summary
 
-    genai.configure(api_key=api_key)
-    # 요약에는 성능이 좋고 저렴한 flash 모델을 사용합니다.
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    
-    # 요약을 위한 프롬프트 구성
-    # 너무 많은 대화를 보내면 요약 단계에서 쿼터가 터질 수 있으므로 최근 15개 정도만 참고합니다.
-    recent_context = "\n".join([f"[{m['role']}]: {m['parts'][0]}" for m in messages[-15:]])
-    
-    prompt = f"""
-    당신은 소설 작가의 편집 보조입니다. 아래 내용을 바탕으로 지금까지의 '소설 줄거리'를 핵심 위주로 업데이트하세요.
-    
-    [기존 줄거리]:
-    {current_summary if current_summary else "이야기 시작 단계입니다."}
-    
-    [최근 대화 내용]:
-    {recent_context}
-    
-    [지침]:
-    1. 인물들의 관계 변화, 획득한 아이템, 현재 위치, 진행 중인 사건을 중심으로 요약하세요.
-    2. 다음 대화에서 AI 작가가 일관성을 유지할 수 있도록 간결하게 작성하세요.
-    3. 3~5문장 내외로 요약하세요.
-    
-    업데이트된 줄거리 요약:
-    """
-    
     try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        
+        # 최근 맥락 추출 (메시지 구조에 맞춰 안전하게 추출)
+        recent_context = ""
+        for m in messages[-10:]: # 너무 길면 요약 호출 자체가 실패하므로 10개로 제한
+            role = "주인공" if m['role'] == 'user' else "AI 작가"
+            content = m['parts'][0]
+            recent_context += f"[{role}]: {content}\n"
+        
+        prompt = f"""
+        소설 편집 보조로서 아래 내용을 바탕으로 '소설 줄거리'를 핵심 위주로 업데이트하세요.
+        
+        [기존 줄거리]:
+        {current_summary if current_summary else "이야기 시작 단계입니다."}
+        
+        [최근 대화 내용]:
+        {recent_context}
+        
+        [지침]:
+        1. 인물 관계 변화, 아이템, 위치, 진행 사건 중심으로 요약.
+        2. AI 작가가 일관성을 유지하도록 간결하게 작성.
+        3. 반드시 3~5문장 내외로 요약.
+        """
+        
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
+        # 에러 발생 시 기존 요약을 유지하여 중단 방지
         print(f"요약 생성 중 오류 발생: {e}")
         return current_summary

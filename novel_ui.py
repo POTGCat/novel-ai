@@ -81,7 +81,7 @@ def get_model_info():
     if active_key:
         try:
             genai.configure(api_key=active_key)
-            return genai.GenerativeModel('gemini-1.5-flash'), source, active_key
+            return genai.GenerativeModel('gemini-2.5-flash'), source, active_key
         except:
             return None, None, None
     return None, None, None
@@ -635,11 +635,12 @@ if prompt := st.chat_input("행동이나 대사를 입력하세요..."):
             st.session_state.messages.append({"role": "user", "parts": [prompt]})
             save_json(HISTORY_FILE, {"chat_history": st.session_state.messages})
 
-            # 일정 주기마다 요약 업데이트
+            # 일정 주기마다 요약 업데이트 (10회마다)
             if len(st.session_state.messages) % 10 == 0:
                 with st.spinner("중간 줄거리 정리 중..."):
                     old_summary = st.session_state.settings.get('story_summary', "")
-                    new_summary = get_summary(config_data['api_key'], st.session_state.messages, old_summary)
+                    # 🔥 config_data['api_key'] 대신 실제 활성화된 active_api_key를 전달합니다.
+                    new_summary = get_summary(active_api_key, st.session_state.messages, old_summary)
                     st.session_state.settings['story_summary'] = new_summary
                     save_json(SETTINGS_FILE, st.session_state.settings)
             
