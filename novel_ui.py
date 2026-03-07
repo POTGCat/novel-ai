@@ -150,7 +150,7 @@ if not api_key:
 if api_key:
     genai.configure(api_key=api_key)
     # 모델명 확인 (작가님이 쓰시는 버전 유지)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
 else:
     # 키가 없을 때만 사이드바에 안내
     st.sidebar.warning("🔑 API 키를 설정 탭에서 입력해주세요.")
@@ -180,25 +180,36 @@ with st.sidebar:
         if IS_CLOUD:
             st.info("클라우드 모드: 브라우저 종료 시 내용이 사라지니 꼭 저장하세요!")
     
-        # 1. 불러오기 (Upload)
+        # 1. 불러오기 (Upload) - 설정값까지 복구
         uploaded_file = st.file_uploader("소설 파일(.json) 불러오기", type="json")
         if uploaded_file is not None:
             try:
                 uploaded_data = json.load(uploaded_file)
+                
+                # 소설 내용 복구
                 st.session_state.messages = uploaded_data.get("chat_history", [])
-                st.success("소설을 불러왔습니다!")
-                # 주의: 여기서 st.rerun()을 하면 업로더가 초기화될 수 있으니 상황에 따라 조절
+        
+                # [추가] 설정값 복구 (파일에 설정 데이터가 있을 경우에만)
+                if "settings" in uploaded_data:
+                    st.session_state.settings.update(uploaded_data["settings"])
+            
+                st.success("소설과 설정값을 모두 불러왔습니다!")
+                st.rerun()
             except:
-                st.error("파일 형식이 올바르지 않습니다.")
+                st.error("파일 형식이 올바르지 않거나 데이터가 손상되었습니다.")
 
-        # 2. 내보내기 (Download)
+        # 2. 내보내기 (Download) - 설정값 포함하여 패킹
         if st.session_state.messages:
-            output_data = {"chat_history": st.session_state.messages}
-            json_string = json.dumps(output_data, indent=4, ensure_ascii=False)
+            # 소설 내용과 현재 세션의 설정을 하나의 딕셔너리로 묶음
+            combined_data = {
+                "chat_history": st.session_state.messages,
+                "settings": st.session_state.settings  # 현재의 모든 설정값 포함
+            }
+            json_string = json.dumps(combined_data, indent=4, ensure_ascii=False)
             st.download_button(
-                label="📥 현재 이야기 다운로드",
+                label="📥 현재 이야기 & 설정 저장",
                 data=json_string,
-                file_name="my_novel_history.json",
+                file_name="my_novel_full_data.json",
                 mime="application/json",
                 use_container_width=True
             )
@@ -314,10 +325,16 @@ with st.sidebar:
                     "restrict_player_dialogue": res_d
                 })
                 s['player_setting']['name'] = p_n
-                save_json(SETTINGS_FILE, s)
-                st.success("소설 설정이 저장되었습니다!")
+    
+                # 로컬은 파일 저장, 클라우드는 세션 유지
+                save_json(SETTINGS_FILE, s) 
+            
+                if IS_CLOUD:
+                    st.success("설정이 세션에 반영되었습니다! 영구 저장을 원하시면 '정보' 탭에서 파일을 다운로드하세요.")
+                else:
+                    st.success("소설 설정이 저장되었습니다!")
                 st.rerun()
-
+    
         st.divider()
 
         # 디자인 및 고급 프롬프트 설정
@@ -337,6 +354,7 @@ with st.sidebar:
                                     height=150)
             
             if st.form_submit_button("고급 설정 저장"):
+                # 1. 현재 세션의 설정값 갱신 (화면에 즉시 반영됨)
                 s.update({
                     "ui_faded_color": new_faded,
                     "ui_dialogue_color": new_dialogue,
@@ -344,8 +362,17 @@ with st.sidebar:
                     "custom_sys_inst": new_sys_inst,
                     "custom_rules": new_rules
                 })
+                
+                # 2. 로컬 환경일 때만 실제 파일(settings.json)에 저장
                 save_json(SETTINGS_FILE, s)
-                st.success("고급 설정 반영 완료!")
+                
+                # 3. 사용자 안내 및 화면 갱신
+                if IS_CLOUD:
+                    st.success("🎨 디자인과 프롬프트가 세션에 적용되었습니다!")
+                    st.info("💡 주의: 클라우드에서는 브라우저를 닫으면 초기화됩니다. 영구 저장은 '정보' 탭에서 '다운로드' 하세요.")
+                else:
+                    st.success("고급 설정이 파일에 저장되었습니다!")
+                
                 st.rerun()
 
         # NPC 수동 관리
