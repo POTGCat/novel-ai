@@ -44,21 +44,24 @@ def save_json(file_path, data):
 
 # 1. API 키 결정 로직
 active_api_key = None
+key_source = None  # 추가: 키의 출처를 기록
 
-# 우선순위 1: 사용자가 화면에서 직접 입력한 키 (개인별 세션)
 if "user_api_key" in st.session_state and st.session_state.user_api_key:
     active_api_key = st.session_state.user_api_key
+    key_source = "user"
 else:
-    # 우선순위 2: 클라우드 시크릿 (작가님 제공 체험용)
     try:
         active_api_key = st.secrets.get("GEMINI_API_KEY")
+        if active_api_key:
+            key_source = "cloud"
     except:
         active_api_key = None
 
-    # 우선순위 3: 로컬 config.json (내 컴퓨터 실행용)
     if not active_api_key:
         config_data = load_json("config.json", {"api_key": ""})
         active_api_key = config_data.get('api_key', '')
+        if active_api_key:
+            key_source = "local"
 
 # 2. 모델 설정
 if active_api_key:
@@ -173,20 +176,23 @@ with st.sidebar:
         
         # 현재 실제로 모델이 사용 중인 active_api_key를 기준으로 판단합니다.
         if active_api_key:
-            # 사용자가 직접 입력한 키인지, 시스템(작가님) 키인지 구분
-            if st.session_state.get("user_api_key"):
+            if key_source == "user":
                 st.success("✅ 개인 API 키 연결됨")
                 st.caption("현재 본인의 API 쿼터를 사용 중입니다.")
-            elif IS_CLOUD:
+            elif key_source == "cloud":
                 st.info("☁️ 공용 API 키 연결됨")
                 st.caption("작가님이 제공한 체험용 쿼터를 사용 중입니다.")
-            else:
-                st.success("🏠 로컬 API 키 연결됨")
+            elif key_source == "local":
+                # 클라우드 배포 중인데 local이 뜬다면 config.json이 올라간 것일 수 있습니다.
+                if IS_CLOUD:
+                    st.warning("⚠️ 서버 설정 키 연결됨")
+                    st.caption("서버 내장 설정 파일을 사용 중입니다.")
+                else:
+                    st.success("🏠 로컬 API 키 연결됨")
             
             st.markdown("[사용량 확인](https://aistudio.google.com/app/plan_free)")
         else:
             st.error("❌ API 키 설정 필요")
-            st.caption("설정 탭에서 API 키를 입력해야 소설 작성이 가능합니다.")
 
         st.divider()
         st.subheader("💾 데이터 관리")
