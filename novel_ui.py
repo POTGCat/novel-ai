@@ -13,7 +13,8 @@ HISTORY_FILE = "story_log.json"
 # --- [2. 데이터 관리 함수] ---
 # [추가] 클라우드 여부 확인 (Streamlit Cloud는 보통 이 환경변수가 존재함)
 # [환경 체크] 클라우드 배포 상태인지 확인
-IS_CLOUD = "STREAMLIT_RUNTIME_ENV" in os.environ or "STREAMLIT_SERVER_PORT" in os.environ
+#IS_CLOUD = "STREAMLIT_RUNTIME_ENV" in os.environ or "STREAMLIT_SERVER_PORT" in os.environ
+IS_CLOUD = os.path.exists("/app") or "STREAMLIT_RUNTIME_ENV" in os.environ
 
 def load_json(file_path, default_data):
     """작가님이 주신 로직을 살리되, 클라우드라면 빈 데이터를 반환하여 충돌을 방지합니다."""
