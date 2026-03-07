@@ -361,7 +361,7 @@ with st.sidebar:
         
         if st.session_state.messages:
             full_text = "".join([f"[{'주인공' if m['role']=='user' else 'AI 작가'}]\n{m['parts'][0]}\n\n" for m in st.session_state.messages])
-            st.download_button("📥 현재 이야기 다운로드", data=full_text, file_name="story.txt")
+            st.download_button("📥 현재 이야기 다운로드(txt)", data=full_text, file_name="story.txt")
         st.divider()
         if st.button("🔄 이야기 초기화"):
             st.session_state.messages = []; save_json(HISTORY_FILE, {"chat_history": []}); st.rerun()
