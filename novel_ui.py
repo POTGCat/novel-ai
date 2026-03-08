@@ -416,6 +416,9 @@ with tab_setup:
 
         with st.expander("🎨 AI 묘사 라이브러리 (감정/행동 가이드)", expanded=False):
             st.info("AI가 장면을 묘사할 때 참고할 '버릇'이나 '표현법'을 정의합니다.")
+
+            if 'style_traits' not in st.session_state.settings:
+                s['style_traits'] = {"감정": "기본 감정 가이드", "행동": "기본 행동 가이드"}
             
             traits = st.session_state.settings['style_traits']
             emo_trait = st.text_area("감정 묘사 가이드", value=traits.get('감정', ''))
