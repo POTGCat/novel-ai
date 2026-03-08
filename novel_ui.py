@@ -23,6 +23,27 @@ HISTORY_FILE = "story_log.json"
 
 CURRENT_MODEL = 'gemini-3.1-flash-lite-preview'
 
+DEFAULT_PROMPT_TEMPLATE = """
+    당신은 전문 소설 기획자입니다. 입력된 핵심 키워드를 바탕으로 소설의 '메인 플롯'과 '디테일한 세계관'을 생성하세요.
+    [절대 포함 금지 키워드] : {exclude_keywords}
+    
+    [핵심 키워드]: {keywords}
+    
+    [요청 사항]:
+    1. 주인공의 이름: 이름을 임의로 만들지 마십시오. 주인공은 반드시 '{{{{user}}}}'라고 지칭하십시오.
+    2. 메인 플롯: '{{{{user}}}}'의 목표와 갈등, 그리고 3개 이상의 이벤트를 흥미진진하게 구성할 것. 단 결말은 생성하지 않는다.
+    3. 상세 세계관: 단순히 개념적인 설명이 아니라, 주 무대가 되는 '특정 지역명', '지형적 특징', '그 지역만의 고유한 사회 분위기'를 디테일하게 묘사할 것.
+    4. 지리적 요소: 주요 장소 3~4곳의 명칭과 특징을 포함하여 세계지도를 그리듯 상세히 설명할 것.
+    5. 주의: 제외 키워드와 관련된 설정(예: 현대물인데 갑자기 마법이나 초과학이 나오는 등)은 절대 넣지 마십시오.
+    
+    형식:
+    [PLOT]
+    (내용 작성)
+    [WORLD]
+    (내용 작성)
+    """
+
+
 # --- [2. 데이터 관리 함수] ---
 # [환경 체크] 클라우드 배포 상태인지 확인
 IS_CLOUD = os.path.exists("/app") or "STREAMLIT_RUNTIME_ENV" in os.environ
@@ -374,14 +395,27 @@ with tab_setup:
         col_k1, col_k2 = st.columns([2, 2])
         keywords = col_k1.text_input("핵심 키워드", placeholder="예: 현대, 강남, 검사, 복수")
         exclude_keywords = col_k2.text_input("제외 키워드", placeholder="예: SF, 판타지, 마법, 좀비")
+
+        # 작가님이 직접 수정할 수 있는 프롬프트 편집기
+        user_prompt_custom = st.text_area(
+            "AI에게 내리는 상세 지시서 (편집 가능)", 
+            value=DEFAULT_PROMPT_TEMPLATE, 
+            height=300,
+            help="이 내용을 수정하여 AI의 기획 스타일을 바꿀 수 있습니다. {keywords}와 {exclude_keywords}는 위 입력창의 값으로 치환됩니다. [PLOT]과 [WORLD] 이 글자들은 수정금지! 해당글자 아래의 글들이 자동으로 하단의 플롯과 세계관에 들어갑니다"
+        )
         
         if st.button("🪄 자동 생성 (자동생성 시 무료API는 토큰 제한으로 약 1분간 소설이 정상 출력되지 않을 수 있습니다.)", use_container_width=True):
             if not keywords:
                 st.warning("핵심 키워드를 입력해주세요.")
             else:
                 with st.spinner("AI 기획자가 금기 사항을 피해 세계를 설계 중입니다..."):
+                    final_prompt = user_prompt_custom.format(
+                        keywords=keywords, 
+                        exclude_keywords=exclude_keywords
+                    )
+                    
                     # planner.py의 수정된 함수 호출 (제외 키워드 전달)
-                    result, error = generate_world_plan(active_api_key, keywords, exclude_keywords, CURRENT_MODEL)
+                    result, error = generate_world_plan(active_api_key, final_prompt, CURRENT_MODEL)
                     if error:
                         st.error(f"오류 발생: {error}")
                     else:
@@ -443,28 +477,42 @@ with tab_setup:
                 st.rerun()
     
     # 기존 인물 리스트 및 수정 폼
-    char_list = list(st.session_state.settings['characters'].items())
-    if char_list:
-        cols = st.columns(3) # 화면이 넓으므로 3단으로 배치
-        for idx, (cid, info) in enumerate(char_list):
-            with cols[idx % 3].expander(f"⚙️ {info['name']}"):
-                u_name = st.text_input("이름", value=info['name'], key=f"u_n_{cid}")
-                u_desc = st.text_area("설명", value=info['description'], key=f"u_d_{cid}")
-                u_vis = st.checkbox("사이드바 호감도 표시", value=info.get('is_visible', True), key=f"u_v_{cid}")
-                
-                c1, c2 = st.columns(2)
-                if c1.button("저장", key=f"u_s_{cid}"):
-                    st.session_state.settings['characters'][cid].update({"name": u_name, "description": u_desc, "is_visible": u_vis})
-                    save_json(SETTINGS_FILE, st.session_state.settings)
-                    st.rerun()
-                if c2.button("삭제", key=f"u_r_{cid}"):
+    char_dict = st.session_state.settings.get('characters', {})
+    if char_dict:
+        # 딕셔너리의 키를 리스트로 변환해 순회 (삭제 시 안전함)
+        cids = list(char_dict.keys())
+        cols = st.columns(3)
+        
+        for idx, cid in enumerate(cids):
+            info = char_dict[cid]
+            with cols[idx % 3].expander(f"⚙️ {info['name']}", expanded=False):
+                # 폼으로 감싸서 입력 도중 새로고침 방지
+                with st.form(key=f"form_{cid}"):
+                    u_name = st.text_input("이름", value=info['name'])
+                    u_desc = st.text_area("설명", value=info['description'])
+                    u_vis = st.checkbox("사이드바 호감도 표시", value=info.get('is_visible', True))
+                    
+                    c1, c2 = st.columns(2)
+                    
+                    if c1.form_submit_button("💾 저장"):
+                        # 직접 업데이트
+                        st.session_state.settings['characters'][cid] = {
+                            "name": u_name,
+                            "description": u_desc,
+                            "is_visible": u_vis
+                        }
+                        save_json(SETTINGS_FILE, st.session_state.settings)
+                        st.success("수정 완료!")
+                        st.rerun()
+
+                    # 삭제 버튼은 폼 밖에 두거나, 혹은 별도 처리 (폼 안의 버튼은 하나만 가능하므로)
+                if st.button("🗑️ 삭제", key=f"u_r_{cid}", use_container_width=True):
                     del st.session_state.settings['characters'][cid]
                     save_json(SETTINGS_FILE, st.session_state.settings)
                     st.rerun()
     else:
         st.caption("아직 등록된 등장인물이 없습니다.")
 
-    pass
 
 # ------------------------------------------
 # 🖋️ 2. 소설 집필실 탭 (메인 화면)

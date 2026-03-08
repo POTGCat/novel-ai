@@ -1,6 +1,6 @@
 import google.generativeai as genai
 
-def get_summary(api_key, messages, current_summary="", model_name='gemini-2.5-flash-lite'):
+def get_summary(api_key, messages, current_summary="", model_name='gemini-3.1-flash-lite-preview'):
     """
     지금까지의 대화와 기존 줄거리를 바탕으로 새로운 줄거리 요약을 생성합니다.
     """
