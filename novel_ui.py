@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from summarizer import get_summary
 from planner import generate_world_plan
+from traits import get_style_guidelines
 
 st.set_page_config(
     page_title="AI 소설 집필실",
@@ -42,6 +43,7 @@ DEFAULT_PROMPT_TEMPLATE = """
     [WORLD]
     (내용 작성)
     """
+
 
 
 # --- [2. 데이터 관리 함수] ---
@@ -396,23 +398,56 @@ with tab_setup:
         keywords = col_k1.text_input("핵심 키워드", placeholder="예: 현대, 강남, 검사, 복수")
         exclude_keywords = col_k2.text_input("제외 키워드", placeholder="예: SF, 판타지, 마법, 좀비")
 
+        # 1. traits.py에서 정의된 가이드 데이터를 가져옵니다.
+        style_traits = get_style_guidelines() 
+        
+        # 2. 가져온 딕셔너리를 텍스트 형태로 변환합니다.
+        trait_text = "\n\n### [필수 준수: 서술 스타일 가이드]"
+        for category, items in style_traits.items():
+            trait_text += f"\n- {category}: {items}"
+
         # 작가님이 직접 수정할 수 있는 프롬프트 편집기
         user_prompt_custom = st.text_area(
             "AI에게 내리는 상세 지시서 (편집 가능)", 
             value=DEFAULT_PROMPT_TEMPLATE, 
             height=300,
             help="이 내용을 수정하여 AI의 기획 스타일을 바꿀 수 있습니다. {keywords}와 {exclude_keywords}는 위 입력창의 값으로 치환됩니다. [PLOT]과 [WORLD] 이 글자들은 수정금지! 해당글자 아래의 글들이 자동으로 하단의 플롯과 세계관에 들어갑니다"
-        )
+        ) + trait_text
+
+        with st.expander("🎨 AI 묘사 라이브러리 (감정/행동 가이드)", expanded=False):
+            st.info("AI가 장면을 묘사할 때 참고할 '버릇'이나 '표현법'을 정의합니다.")
+            
+            traits = st.session_state.settings['style_traits']
+            emo_trait = st.text_area("감정 묘사 가이드", value=traits.get('감정', ''))
+            act_trait = st.text_area("행동 묘사 가이드", value=traits.get('행동', ''))
+            
+            if st.button("✨ 라이브러리 저장"):
+                st.session_state.settings['style_traits']['감정'] = emo_trait
+                st.session_state.settings['style_traits']['행동'] = act_trait
+                save_json(SETTINGS_FILE, st.session_state.settings)
+                st.success("묘사 가이드가 업데이트되었습니다!")
         
         if st.button("🪄 자동 생성 (자동생성 시 무료API는 토큰 제한으로 약 1분간 소설이 정상 출력되지 않을 수 있습니다.)", use_container_width=True):
             if not keywords:
                 st.warning("핵심 키워드를 입력해주세요.")
             else:
                 with st.spinner("AI 기획자가 금기 사항을 피해 세계를 설계 중입니다..."):
+
+                    # 1. 현재 세션의 사용자 입력값 가져오기
+                    current_user_traits = st.session_state.settings.get('style_traits', {})
+                    
+                    # 2. traits.py의 함수 호출 (사용자 값을 인자로 전달)
+                    final_style_guide = get_style_guidelines(current_user_traits)
+                    
+                    # 3. 프롬프트 텍스트로 변환
+                    style_text = "\n\n### [🎨 서술 스타일 가이드]"
+                    for category, content in final_style_guide.items():
+                        style_text += f"\n- {category}: {content}"
+                    
                     final_prompt = user_prompt_custom.format(
                         keywords=keywords, 
                         exclude_keywords=exclude_keywords
-                    )
+                    ) + style_text
                     
                     # planner.py의 수정된 함수 호출 (제외 키워드 전달)
                     result, error = generate_world_plan(active_api_key, final_prompt, CURRENT_MODEL)

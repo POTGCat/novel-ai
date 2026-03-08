@@ -1,6 +1,6 @@
 import google.generativeai as genai
 
-def generate_world_plan(active_api_key, full_prompt, model_name='gemini-3.1-flash-lite-preview'):
+def generate_world_plan(active_api_key, full_prompt, model_name='gemini-3.1-flash-lite-preview', style_traits=None):
     """
     사용자가 입력한 키워드를 바탕으로 디테일한 메인 플롯과 세계관을 생성합니다.
     """
