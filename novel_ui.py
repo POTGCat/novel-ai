@@ -341,7 +341,7 @@ with tab_setup:
 
     st.subheader("🤖 키워드로 세계관 자동생성")
     
-    with st.expander("✨ 키워드로 메인 플롯 & 세계관 생성", expanded=False):
+    with st.expander("✨ 키워드로 메인 플롯 & 세계관 생성 (주의! 기존 내용은 사라집니다)", expanded=False):
         col_k1, col_k2 = st.columns([3, 1])
         keywords = col_k1.text_input("핵심 키워드", placeholder="예: 사이버펑크, 안개 도시, 복수")
         
