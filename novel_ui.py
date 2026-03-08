@@ -1,10 +1,13 @@
-import streamlit as st
-from summarizer import get_summary
-from planner import generate_world_plan
-import json
+import sys
 import os
+import streamlit as st
+import json
 import google.generativeai as genai
 import re
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from summarizer import get_summary
+from planner import generate_world_plan
 
 st.set_page_config(
     page_title="AI 소설 집필실",
