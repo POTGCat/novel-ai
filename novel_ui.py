@@ -1,5 +1,6 @@
 import streamlit as st
-from summarizer import get_summary 
+from summarizer import get_summary
+from planner import generate_world_plan
 import json
 import os
 import google.generativeai as genai
@@ -337,6 +338,29 @@ with header_container:
 # ------------------------------------------
 with tab_setup:
     st.info("💡 여기에 작성된 내용은 AI가 이야기를 전개할 때 절대적으로 참고하는 '뼈대'가 됩니다. 언제든 수정 가능합니다.")
+
+    st.subheader("🤖 키워드로 세계관 자동생성")
+    
+    with st.expander("✨ 키워드로 메인 플롯 & 세계관 생성", expanded=False):
+        col_k1, col_k2 = st.columns([3, 1])
+        keywords = col_k1.text_input("핵심 키워드", placeholder="예: 사이버펑크, 안개 도시, 복수")
+        
+        if col_k2.button("🪄 자동 생성", use_container_width=True):
+            if not keywords:
+                st.warning("키워드를 입력해주세요.")
+            else:
+                with st.spinner("AI 기획자가 세계를 설계 중입니다..."):
+                    # 모듈 함수 호출
+                    result, error = generate_world_plan(active_api_key, keywords)
+                    if error:
+                        st.error(f"오류 발생: {error}")
+                    else:
+                        st.session_state.settings['main_plot'] = result['plot']
+                        st.session_state.settings['world_setting'] = result['world']
+                        st.success("새로운 세계관이 설계되었습니다!")
+                        st.rerun()
+
+    st.divider()
     
     with st.form("story_master_plan"):
         s = st.session_state.settings
