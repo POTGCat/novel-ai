@@ -1,6 +1,6 @@
 import google.generativeai as genai
 
-def get_summary(api_key, messages, current_summary=""):
+def get_summary(api_key, messages, current_summary="", model_name='gemini-2.5-flash-lite'):
     """
     지금까지의 대화와 기존 줄거리를 바탕으로 새로운 줄거리 요약을 생성합니다.
     """
@@ -9,7 +9,7 @@ def get_summary(api_key, messages, current_summary=""):
 
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('models/gemini-flash-latest')
+        model = genai.GenerativeModel(model_name)
         
         # 최근 맥락 추출 (메시지 구조에 맞춰 안전하게 추출)
         recent_context = ""

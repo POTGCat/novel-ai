@@ -18,6 +18,8 @@ CONFIG_FILE = "config.json"
 SETTINGS_FILE = "settings.json"
 HISTORY_FILE = "story_log.json"
 
+CURRENT_MODEL = 'gemini-3.1-flash-lite-preview'
+
 # --- [2. 데이터 관리 함수] ---
 # [환경 체크] 클라우드 배포 상태인지 확인
 IS_CLOUD = os.path.exists("/app") or "STREAMLIT_RUNTIME_ENV" in os.environ
@@ -68,7 +70,7 @@ def get_model_info():
     if active_key:
         try:
             genai.configure(api_key=active_key)
-            return genai.GenerativeModel('models/gemini-flash-latest'), source, active_key
+            return genai.GenerativeModel(CURRENT_MODEL), source, active_key
         except:
             return None, None, None
     return None, None, None
@@ -142,7 +144,7 @@ if not current_key and not IS_CLOUD:
 if current_key:
     try:
         genai.configure(api_key=current_key)
-        model = genai.GenerativeModel('models/gemini-flash-latest')
+        model = genai.GenerativeModel(CURRENT_MODEL)
     except Exception as e:
         st.sidebar.error(f"❌ API 연결 오류: {e}")
         model = None
@@ -265,6 +267,7 @@ with st.sidebar:
             2. **`" "` (따옴표)**: 캐릭터의 직접적인 대사를 표현할 때 사용합니다.  
                *예: "누구냐, 거기 숨어있는 놈이!"*
             3. **평문**: 상황 묘사, 캐릭터의 감정, 행동 등을 자유롭게 서술하세요. AI가 문맥을 파악해 이어갑니다.
+            4. {{user}}: 이는 메인플롯과 세계관에서 유저(주인공)을 뜻 합니다. 주인공 이름을 직접 입력해도 되지만, 재사용성을 위해 해당 문자로 처리합니다.
 
             ---
 
@@ -306,6 +309,29 @@ with st.sidebar:
         with col_key2:
             st.link_button("🔑 Google AI Studio", "https://aistudio.google.com/app/apikey", use_container_width=True)
 
+
+        st.divider()
+        if st.button("🔍 내 API 사용 가능 모델 확인"):
+            if not active_api_key:
+                st.error("먼저 API 키를 입력해주세요.")
+            else:
+                try:
+                    genai.configure(api_key=active_api_key)
+                    models = genai.list_models()
+                    
+                    st.write("### 📋 호출 가능한 모델 리스트")
+                    available_models = []
+                    for m in models:
+                        if 'generateContent' in m.supported_generation_methods:
+                            # 'models/' 접두사를 제외한 순수 ID만 추출
+                            model_id = m.name.replace('models/', '')
+                            available_models.append(model_id)
+                            st.code(model_id) # 복사하기 편하게 코드 블록으로 출력
+                    
+                    st.success(f"총 {len(available_models)}개의 모델을 찾았습니다.")
+                except Exception as e:
+                    st.error(f"모델 목록을 가져오는 중 오류 발생: {e}")
+
         st.divider()
         st.subheader("🎨 디자인 및 프롬프트 제어")
         with st.form("advanced_settings"):
@@ -342,22 +368,23 @@ with tab_setup:
     st.subheader("🤖 키워드로 세계관 자동생성")
     
     with st.expander("✨ 키워드로 메인 플롯 & 세계관 생성 (주의! 기존 내용은 사라집니다)", expanded=False):
-        col_k1, col_k2 = st.columns([3, 1])
-        keywords = col_k1.text_input("핵심 키워드", placeholder="예: 사이버펑크, 안개 도시, 복수")
+        col_k1, col_k2 = st.columns([2, 2])
+        keywords = col_k1.text_input("핵심 키워드", placeholder="예: 현대, 강남, 검사, 복수")
+        exclude_keywords = col_k2.text_input("제외 키워드", placeholder="예: SF, 판타지, 마법, 좀비")
         
-        if col_k2.button("🪄 자동 생성", use_container_width=True):
+        if st.button("🪄 자동 생성 (자동생성 시 무료API는 토큰 제한으로 약 1분간 소설이 정상 출력되지 않을 수 있습니다.)", use_container_width=True):
             if not keywords:
-                st.warning("키워드를 입력해주세요.")
+                st.warning("핵심 키워드를 입력해주세요.")
             else:
-                with st.spinner("AI 기획자가 세계를 설계 중입니다..."):
-                    # 모듈 함수 호출
-                    result, error = generate_world_plan(active_api_key, keywords)
+                with st.spinner("AI 기획자가 금기 사항을 피해 세계를 설계 중입니다..."):
+                    # planner.py의 수정된 함수 호출 (제외 키워드 전달)
+                    result, error = generate_world_plan(active_api_key, keywords, exclude_keywords, CURRENT_MODEL)
                     if error:
                         st.error(f"오류 발생: {error}")
                     else:
                         st.session_state.settings['main_plot'] = result['plot']
                         st.session_state.settings['world_setting'] = result['world']
-                        st.success("새로운 세계관이 설계되었습니다!")
+                        st.success("원치 않는 설정을 제외한 새로운 세계관이 설계되었습니다!")
                         st.rerun()
 
     st.divider()
@@ -547,7 +574,7 @@ with tab_write:
                                 # AI 말풍선 밖에서 요약 진행 여부를 보여주기 위해 spinner 활용
                                 with st.spinner("중간 줄거리 정리 중..."):
                                     old_summary = ss.get('story_summary', "")
-                                    new_summary = get_summary(active_api_key, st.session_state.messages, old_summary)
+                                    new_summary = get_summary(active_api_key, st.session_state.messages, old_summary, CURRENT_MODEL)
                                     st.session_state.settings['story_summary'] = new_summary
                                     save_json(SETTINGS_FILE, ss)
                             
